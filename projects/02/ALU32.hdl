@@ -1,0 +1,69 @@
+CHIP ALU32 {
+    IN
+        a1[16], a2[16], b1[16], b2[16],  // 32-bit inputs
+        zx, // zero the x input?
+        nx, // negate the x input?
+        zy, // zero the y input?
+        ny, // negate the y input?
+        f,  // compute (out = x + y) or (out = x & y)?
+        no; // negate the out output?
+    OUT 
+        outFinal1[16], // 32-bit output
+        outFinal2[16], // 32-bit output
+        zr,      // if (out == 0) equals 1, else 0
+        ng,      // if (out[31] == 1) equals 1, else 0
+        overflow; // if (FullAdder16.carry() == 1) equals 1, else 0
+
+    PARTS:
+        // ALU 1
+        Mux16(a=a1, b= false, sel=zx , out= x1);
+        Not16(in= x1, out=Nx1 );
+        Mux16(a=b1, b= false, sel= zy, out= y1);
+        Not16(in= y1, out=Ny1 );
+
+        Mux16(a= x1, b= Nx1, sel= nx, out= x2);
+        Mux16(a= y1, b= Ny1, sel= ny, out= y2);
+
+        And16(a= x2, b= y2, out= xANDy);
+        
+        FullAdder16(a= x2, b= y2, carryInitial= false, out= xPLUSy, carryFinal= cOut1);
+        
+        Mux16(a= xANDy, b= xPLUSy, sel= f, out= preOut);
+        Not16(in= preOut, out= Nout);
+        Mux16(a= preOut, b= Nout, sel= no, out= out1);
+        
+        Or16Way(in=out1, out= outRes);
+        
+        Not(in= outRes, out= zr1);
+
+        Mux16(a= out1, b= false, sel= false, out= outFinal1);
+
+        // ALU 2
+        Mux16(a=a2, b= false, sel=zx , out= x3);
+        Not16(in= x3, out=Nx3 );
+        Mux16(a= b2, b= false, sel= zy, out= y3);
+        Not16(in= y3, out=Ny3 );
+
+        Mux16(a= x3, b= Nx3, sel= nx, out= x4);
+        Mux16(a= y3, b= Ny3, sel= ny, out= y4);
+
+        And16(a= x4, b= y4, out= xANDy2);
+
+        FullAdder16(a= x4, b= y4, carryInitial= cOut1, out= xPLUSy2, carryFinal= overflow);
+        
+        Mux16(a= xANDy2, b= xPLUSy2, sel= f, out= preOut2);
+        Not16(in= preOut2, out= Nout2);
+        Mux16(a= preOut2, b= Nout2, sel= no, out= out2, out[15]=ng);
+        
+        Or16Way(in=out2, out= outRes2);
+
+        Not(in= outRes2, out= zr2);
+
+        // Final output
+        // Mux16(a= out1, b= out2, sel=false, out= out[0..15]);
+        // Mux16(a= out1, b= out2, sel=true, out= out[16..31]);
+
+        Mux16(a= out2, b= false, sel= false, out= outFinal2);
+
+        And(a= zr1, b= zr2, out= zr);
+}
